@@ -1,0 +1,18 @@
+{
+  "short_name": "BioLens",
+  "name": "BioLens by ZettaCreations",
+  "description": "Scan a food barcode or nutrition label to instantly analyze its healthiness.",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3144/3144456.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0a0a0a",
+  "theme_color": "#10b981",
+  "display": "standalone",
+  "orientation": "portrait"
+}
