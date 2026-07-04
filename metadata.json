@@ -1,5 +1,5 @@
 {
-  "name": "BioLens by ZettaCreations",
+  "name": "NutriLens",
   "description": "Scan a food barcode or upload a photo of nutrition labels and ingredients to instantly analyze its healthiness, view an AI health score, and discover healthier alternatives.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

@@ -1,6 +1,8 @@
 export interface FoodAnalysisResult {
   barcode?: string;
   notice?: string;
+  isPrediction?: boolean;
+  dataSource?: 'api' | 'scrape' | 'prediction';
   productName: string;
   detectedFromImage: 'barcode' | 'label' | 'manual' | 'camera';
   healthScore: number; // 0 to 100

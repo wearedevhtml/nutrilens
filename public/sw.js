@@ -1,5 +1,5 @@
-// Service worker for BioLens PWA installation support
-const CACHE_NAME = 'biolens-cache-v1';
+// Service worker for NutriLens PWA installation support
+const CACHE_NAME = 'nutrilens-cache-v1';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

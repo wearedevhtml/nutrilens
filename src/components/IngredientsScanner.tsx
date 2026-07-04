@@ -28,7 +28,7 @@ export default function IngredientsScanner() {
   const [result, setResult] = useState<any | null>(null);
 
   // Camera capture states
-  const [showCamera, setShowCamera] = useState(false);
+  const [showCamera, setShowCamera] = useState(true);
   const [cameraLoading, setCameraLoading] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
@@ -51,41 +51,8 @@ export default function IngredientsScanner() {
   };
 
   // Start camera helper
-  const startCamera = async () => {
-    setCameraLoading(true);
-    setCameraError(null);
+  const startCamera = () => {
     setShowCamera(true);
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-    }
-
-    try {
-      const constraints = {
-        video: {
-          facingMode: facingMode,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.setAttribute("playsinline", "true");
-        await videoRef.current.play();
-      }
-      setCameraLoading(false);
-    } catch (err: any) {
-      console.warn("Camera access failed:", err);
-      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        setCameraError("Camera permission denied. Please click the camera/lock icon in your browser address bar, grant permission, and try again, or use the photo upload option instead.");
-      } else {
-        setCameraError(`Could not access camera: ${err.message || "Please grant camera permissions or select a photo of the ingredients list instead."}`);
-      }
-      setCameraLoading(false);
-    }
   };
 
   // Flip camera helper
@@ -93,17 +60,72 @@ export default function IngredientsScanner() {
     setFacingMode(prev => prev === "environment" ? "user" : "environment");
   };
 
-  // Effect to restart camera when facingMode changes
+  // Effect to restart camera when facingMode or showCamera changes
   useEffect(() => {
-    if (showCamera) {
-      startCamera();
-    }
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+    let isCurrent = true;
+
+    const runStart = async () => {
+      if (showCamera) {
+        setCameraLoading(true);
+        setCameraError(null);
+
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+        }
+
+        try {
+          const constraints = {
+            video: {
+              facingMode: facingMode,
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          };
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          
+          if (!isCurrent) {
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+          }
+
+          streamRef.current = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            videoRef.current.setAttribute("playsinline", "true");
+            try {
+              await videoRef.current.play();
+            } catch (playErr: any) {
+              if (playErr.name !== "AbortError") {
+                console.warn("Play interrupted or failed:", playErr);
+              }
+            }
+          }
+          setCameraLoading(false);
+        } catch (err: any) {
+          if (!isCurrent) return;
+          console.warn("Camera access failed:", err);
+          if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+            setCameraError("Camera permission denied. Please click the camera/lock icon in your browser address bar, grant permission, and try again, or use the photo upload option instead.");
+          } else {
+            setCameraError(`Could not access camera: ${err.message || "Please grant camera permissions or select a photo of the ingredients list instead."}`);
+          }
+          setCameraLoading(false);
+        }
       }
     };
-  }, [facingMode]);
+
+    runStart();
+
+    return () => {
+      isCurrent = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [facingMode, showCamera]);
 
   // Capture photo from stream
   const capturePhoto = () => {

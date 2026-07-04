@@ -110,6 +110,16 @@ export default function BarcodeHistory({
                     <span className="font-semibold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded text-[10px]">
                       Score: {item.result.healthScore}
                     </span>
+                    <span className="text-stone-200">•</span>
+                    {item.result.isPrediction ? (
+                      <span className="bg-amber-50 text-amber-800 border border-amber-100 px-1.5 py-0.5 rounded text-[9px] font-mono font-extrabold tracking-wide">
+                        PREDICTED
+                      </span>
+                    ) : (
+                      <span className="bg-emerald-50/80 text-emerald-800 border border-emerald-100/50 px-1.5 py-0.5 rounded text-[9px] font-mono font-extrabold tracking-wide">
+                        VERIFIED
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

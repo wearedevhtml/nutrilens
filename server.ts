@@ -97,6 +97,139 @@ async function generateContentWithRetry(contents: any[], model: string, config: 
   }
 }
 
+/**
+ * Browses the Open Food Facts product HTML page directly for a barcode,
+ * extracts raw page elements, and utilizes Gemini to accurately parse
+ * ingredients and nutrition facts.
+ */
+async function scrapeProductFromHtml(barcode: string): Promise<any> {
+  const url = `https://world.openfoodfacts.org/product/${barcode}`;
+  console.log(`[Scraper] Browsing Open Food Facts page directly: ${url}`);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    });
+
+    if (!response.ok) {
+      console.log(`[Scraper] Direct browse failed. Status: ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
+    console.log(`[Scraper] Fetched HTML. Length: ${html.length} chars.`);
+
+    let contentSnippets = "";
+
+    // Extract product page titles/headings
+    const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/i);
+    if (titleMatch) {
+      contentSnippets += `Page Title: ${titleMatch[1].trim()}\n\n`;
+    }
+
+    const h1Match = html.match(/<h1[\s\S]*?>([\s\S]*?)<\/h1>/i);
+    if (h1Match) {
+      contentSnippets += `Main Header: ${h1Match[1].replace(/<[^>]*>/g, "").trim()}\n\n`;
+    }
+
+    // Attempt to isolate standard ingredients block
+    const ingredientsMatch = html.match(/<div[^>]*?id="ingredients_list"[^>]*?>([\s\S]*?)<\/div>/i) ||
+                             html.match(/<div[^>]*?class="ingredients_list"[^>]*?>([\s\S]*?)<\/div>/i);
+    if (ingredientsMatch) {
+      contentSnippets += `Ingredients Element HTML:\n${ingredientsMatch[0].substring(0, 4000)}\n\n`;
+    } else {
+      const ingIdx = html.toLowerCase().indexOf("ingredients");
+      if (ingIdx !== -1) {
+        contentSnippets += `Ingredients Surrounding Text:\n${html.substring(Math.max(0, ingIdx - 150), Math.min(html.length, ingIdx + 1200)).replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "")}\n\n`;
+      }
+    }
+
+    // Attempt to isolate standard nutrition facts block
+    const nutritionMatch = html.match(/<table[^>]*?class="nutrition_data_table"[^>]*?>([\s\S]*?)<\/table>/i) ||
+                           html.match(/<table[^>]*?id="nutrition_data_table"[^>]*?>([\s\S]*?)<\/table>/i) ||
+                           html.match(/<div[^>]*?id="nutrition_data_table"[^>]*?>([\s\S]*?)<\/div>/i);
+    if (nutritionMatch) {
+      contentSnippets += `Nutrition Element HTML:\n${nutritionMatch[0].substring(0, 4000)}\n\n`;
+    } else {
+      const nutIdx = html.toLowerCase().indexOf("nutrition");
+      if (nutIdx !== -1) {
+        contentSnippets += `Nutrition Surrounding Text:\n${html.substring(Math.max(0, nutIdx - 150), Math.min(html.length, nutIdx + 1200)).replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "")}\n\n`;
+      }
+    }
+
+    // Fallback block in case we have extremely little extracted context
+    if (contentSnippets.length < 400) {
+      const simplified = html
+        .replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[\s\S]*?<\/style>/gi, "")
+        .replace(/<svg[\s\S]*?<\/svg>/gi, "")
+        .replace(/<head>[\s\S]*?<\/head>/gi, "")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ");
+      contentSnippets = simplified.substring(0, 18000);
+    }
+
+    if (ai) {
+      console.log(`[Scraper] Requesting Gemini to parse Open Food Facts page context for: ${barcode}`);
+      const extractionPrompt = `You are a professional nutrition expert and toxicologist.
+An application has browsed the official Open Food Facts product web page "https://world.openfoodfacts.org/product/${barcode}".
+Below is the extracted HTML/text content from that product page:
+
+--- BEGIN PAGE CONTENT ---
+${contentSnippets}
+--- END PAGE CONTENT ---
+
+Based strictly on this page, please extract and reconstruct:
+1. The real Product Brand and Name (e.g. "Haldiram's Aloo Bhujia", "Britannia Good Day", "MTR Rava Idli").
+2. The complete, authentic, comma-separated ingredients list. Do not summarize or truncate.
+3. Standard nutritional parameters (prefer per 100g, or per serving if 100g is not listed):
+   - Calories (in kcal)
+   - Total Fat (in grams)
+   - Saturated Fat (in grams)
+   - Sugar (in grams)
+   - Sodium (in milligrams; convert salt to sodium if needed: 1g salt = 400mg sodium)
+   - Protein (in grams)
+   - Fiber (in grams)
+
+Return a single JSON object conforming exactly to this schema:
+{
+  "productName": "Brand and Name",
+  "ingredients": "comma-separated ingredients list",
+  "calories": 450, // number
+  "totalFat": 20, // number
+  "saturatedFat": 9, // number
+  "sugar": 5, // number
+  "sodium": 350, // number
+  "protein": 6, // number
+  "fiber": 2 // number
+}
+
+CRITICAL: Do not invent, guess, or estimate any data if not visible or present on the page context. If ingredients are missing, set ingredients to "Ingredients not listed". Only return the raw JSON object. Do not wrap it in markdown code blocks or add any text.`;
+
+      const scrapeResponse = await generateContentWithRetry(
+        [extractionPrompt],
+        "gemini-3.1-flash-lite",
+        {
+          responseMimeType: "application/json",
+        }
+      );
+
+      if (scrapeResponse && scrapeResponse.text) {
+        const parsedData = JSON.parse(scrapeResponse.text.trim());
+        if (parsedData && parsedData.productName && !parsedData.productName.toLowerCase().includes("unknown")) {
+          console.log(`[Scraper] Product scraped and parsed successfully: "${parsedData.productName}"`);
+          return parsedData;
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error(`[Scraper] Scraper error for barcode ${barcode}:`, err?.message || err);
+  }
+  return null;
+}
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -206,11 +339,37 @@ async function startServer() {
             let finalProtein = protein;
             let finalFiber = fiber;
             let noticeMessage = "";
+            let isPrediction = false;
+            let dataSource: 'api' | 'scrape' | 'prediction' = 'api';
 
             if ((hasNoIngredients || hasVeryLowNutrition) && ai) {
-              console.log(`[Database Augmentation] Product "${productName}" has incomplete ingredients or nutrition facts on OFF. Querying BioLens AI Registry...`);
+              console.log(`[Database Augmentation] Product "${productName}" has incomplete ingredients or nutrition facts on OFF. Querying live product webpage direct scrape first...`);
+              let resolvedViaScrape = false;
               try {
-                const augmentationPrompt = `You are an expert food nutritionist, toxicologist, and chemical analyst.
+                const scrapedProduct = await scrapeProductFromHtml(bcode);
+                if (scrapedProduct && scrapedProduct.ingredients && scrapedProduct.ingredients !== "Ingredients not listed" && scrapedProduct.ingredients.trim().length > 10) {
+                  console.log(`[Scraper] Successfully retrieved complete parameters via direct webpage scrape.`);
+                  finalIngredients = scrapedProduct.ingredients;
+                  finalCalories = scrapedProduct.calories !== undefined ? scrapedProduct.calories : finalCalories;
+                  finalTotalFat = scrapedProduct.totalFat !== undefined ? scrapedProduct.totalFat : finalTotalFat;
+                  finalSaturatedFat = scrapedProduct.saturatedFat !== undefined ? scrapedProduct.saturatedFat : finalSaturatedFat;
+                  finalSugar = scrapedProduct.sugar !== undefined ? scrapedProduct.sugar : finalSugar;
+                  finalSodium = scrapedProduct.sodium !== undefined ? scrapedProduct.sodium : finalSodium;
+                  finalProtein = scrapedProduct.protein !== undefined ? scrapedProduct.protein : finalProtein;
+                  finalFiber = scrapedProduct.fiber !== undefined ? scrapedProduct.fiber : finalFiber;
+                  noticeMessage = "Product details successfully parsed directly from Open Food Facts web registry page.";
+                  resolvedViaScrape = true;
+                  dataSource = 'scrape';
+                  isPrediction = false;
+                }
+              } catch (scrapeErr) {
+                console.log("[Scraper Warning] Direct webpage scrape failed during augmentation:", scrapeErr);
+              }
+
+              if (!resolvedViaScrape) {
+                console.log(`Webpage scrape returned incomplete data. Re-routing to NutriLens AI Registry database for reconstruction...`);
+                try {
+                  const augmentationPrompt = `You are an expert food nutritionist, toxicologist, and chemical analyst.
 The product "${productName}" (barcode: ${bcode}) was successfully found in Open Food Facts, but its database entry has missing ingredient lists or zeroed nutritional parameters.
 Please look up or scientifically reconstruct the standard, authentic ingredient list and nutrition profile (per 100g or per standard serving) for this exact product (which is commonly sold in India).
 
@@ -229,7 +388,7 @@ You MUST return a JSON object with this exact structure:
 CRITICAL: Do not invent or estimate random data. Be highly accurate, objective, and reference official nutritional safety sheets for Indian food manufacturers (like Haldiram, Britannia, Amul, Nestle India, etc.).
 Return ONLY the raw JSON object. Do not wrap it in markdown code blocks or write introductory text.`;
 
-                const augResponse = await generateContentWithRetry(
+                  const augResponse = await generateContentWithRetry(
                   [augmentationPrompt],
                   "gemini-3.1-flash-lite",
                   {
@@ -248,13 +407,16 @@ Return ONLY the raw JSON object. Do not wrap it in markdown code blocks or write
                     finalSodium = parsedAug.sodium !== undefined ? parsedAug.sodium : finalSodium;
                     finalProtein = parsedAug.protein !== undefined ? parsedAug.protein : finalProtein;
                     finalFiber = parsedAug.fiber !== undefined ? parsedAug.fiber : finalFiber;
-                    noticeMessage = "Database parameters augmented using BioLens AI Indian product registry for maximum toxicological precision.";
+                    noticeMessage = "Database parameters augmented using NutriLens AI Indian product registry for maximum toxicological precision.";
+                    dataSource = 'prediction';
+                    isPrediction = true;
                   }
                 }
               } catch (augErr: any) {
                 console.log("[Database Augmentation] Could not augment product parameters:", augErr?.message || augErr);
               }
             }
+          }
 
             console.log(`Evaluating food metadata for: ${productName}.`);
             if (!productName || productName.toLowerCase().includes("unknown") || productName.trim() === "") {
@@ -279,13 +441,45 @@ Return ONLY the raw JSON object. Do not wrap it in markdown code blocks or write
 
             calculatedResult.barcode = bcode;
             calculatedResult.detectedFromImage = "barcode";
+            calculatedResult.isPrediction = isPrediction;
+            calculatedResult.dataSource = dataSource;
             if (noticeMessage) {
               calculatedResult.notice = noticeMessage;
             }
 
             return res.json(calculatedResult);
           } else if (offResponse.status === 404 || (data && data.status === 0)) {
-            console.log(`Product with barcode ${bcode} not found in OFF. Searching BioLens AI Indian and international registries...`);
+            console.log(`Product with barcode ${bcode} not found in OFF API. Attempting live product webpage direct scrape...`);
+            
+            try {
+              const scrapedProduct = await scrapeProductFromHtml(bcode);
+              if (scrapedProduct && scrapedProduct.productName && !scrapedProduct.productName.toLowerCase().includes("unknown")) {
+                console.log(`[Scraper] Successfully resolved product ${bcode} by direct webpage scrape -> ${scrapedProduct.productName}`);
+                                const calculatedResult = calculateHealthScoreAndGrade({
+                  productName: scrapedProduct.productName,
+                  calories: scrapedProduct.calories || 0,
+                  totalFat: scrapedProduct.totalFat || 0,
+                  saturatedFat: scrapedProduct.saturatedFat || 0,
+                  sugar: scrapedProduct.sugar || 0,
+                  sodium: scrapedProduct.sodium || 0,
+                  protein: scrapedProduct.protein || 0,
+                  fiber: scrapedProduct.fiber || 0,
+                  ingredients: scrapedProduct.ingredients || "Ingredients not listed"
+                });
+
+                calculatedResult.barcode = bcode;
+                calculatedResult.detectedFromImage = "barcode";
+                calculatedResult.isPrediction = false;
+                calculatedResult.dataSource = 'scrape';
+                calculatedResult.notice = "Product resolved successfully by directly browsing & parsing the Open Food Facts webpage.";
+                
+                return res.json(calculatedResult);
+              }
+            } catch (scrapeErr) {
+              console.log("[Scraper Warning] Direct webpage scrape failed during 404 fallback:", scrapeErr);
+            }
+
+            console.log(`Product webpage scraping failed or returned no results. Falling back to NutriLens AI registries...`);
             
             if (ai) {
               try {
@@ -322,7 +516,7 @@ Return ONLY the raw JSON object. Do not wrap it in markdown code blocks or write
                 if (registryResponse && registryResponse.text) {
                   const parsedResult = JSON.parse(registryResponse.text.trim());
                   if (parsedResult && parsedResult.found && parsedResult.productName && !parsedResult.productName.toLowerCase().includes("unknown")) {
-                    console.log(`[BioLens AI Registry] Successfully resolved barcode ${bcode} -> ${parsedResult.productName}`);
+                    console.log(`[NutriLens AI Registry] Successfully resolved barcode ${bcode} -> ${parsedResult.productName}`);
                     
                     const calculatedResult = calculateHealthScoreAndGrade({
                       productName: parsedResult.productName,
@@ -338,13 +532,15 @@ Return ONLY the raw JSON object. Do not wrap it in markdown code blocks or write
 
                     calculatedResult.barcode = bcode;
                     calculatedResult.detectedFromImage = "barcode";
-                    calculatedResult.notice = "Product resolved successfully from BioLens AI Indian product registry database.";
+                    calculatedResult.isPrediction = true;
+                    calculatedResult.dataSource = 'prediction';
+                    calculatedResult.notice = "Product resolved successfully from NutriLens AI Indian product registry database.";
                     
                     return res.json(calculatedResult);
                   }
                 }
               } catch (registryErr: any) {
-                console.log("[BioLens AI Registry] Could not resolve barcode via registry:", registryErr?.message || registryErr);
+                console.log("[NutriLens AI Registry] Could not resolve barcode via registry:", registryErr?.message || registryErr);
               }
             }
 
@@ -497,7 +693,7 @@ Return ONLY the raw JSON object. Do not wrap it in markdown code blocks or write
       if (!ai) {
         return res.status(503).json({
           error: "AI Scanner Unavailable",
-          message: "BioLens AI engine is not currently configured or available on the server. Please fill in packaging details manually using the Manual Builder."
+          message: "NutriLens AI engine is not currently configured or available on the server. Please fill in packaging details manually using the Manual Builder."
         });
       }
 
@@ -536,7 +732,7 @@ Return ONLY the raw JSON object. Do not wrap it in markdown code blocks or write
       );
 
       if (!response || !response.text) {
-        throw new Error("No response received from BioLens AI.");
+        throw new Error("No response received from NutriLens AI.");
       }
 
       const parsedData = JSON.parse(response.text.trim());
@@ -556,7 +752,9 @@ Return ONLY the raw JSON object. Do not wrap it in markdown code blocks or write
 
       calculatedResult.barcode = bcode || undefined;
       calculatedResult.detectedFromImage = "barcode";
-      calculatedResult.notice = `Successfully reconstructed ingredients & nutrition facts using BioLens AI Indian product registry database for "${parsedData.productName}".`;
+      calculatedResult.isPrediction = true;
+      calculatedResult.dataSource = 'prediction';
+      calculatedResult.notice = `Successfully reconstructed ingredients & nutrition facts using NutriLens AI Indian product registry database for "${parsedData.productName}".`;
 
       return res.json(calculatedResult);
     } catch (err: any) {

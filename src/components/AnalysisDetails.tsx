@@ -323,6 +323,27 @@ Check your food healthy scores with Food Barcode Health Scanner!`;
                 Barcode: {result.barcode}
               </p>
             )}
+
+            {/* Verification Status Badge */}
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {result.isPrediction ? (
+                <div className="inline-flex items-center gap-1.5 bg-amber-50/90 border border-amber-200/50 text-amber-800 px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono uppercase shadow-3xs">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                  <span>AI Prediction / Reconstructed</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 bg-emerald-50/90 border border-emerald-200/50 text-emerald-800 px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono uppercase shadow-3xs">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Verified Source / Real Accurate Answer</span>
+                </div>
+              )}
+              {result.dataSource && (
+                <span className="text-[9px] text-stone-400 font-mono font-bold uppercase tracking-wide">
+                  ({result.dataSource === 'api' ? 'OFF API' : result.dataSource === 'scrape' ? 'Direct OFF Web Scraping' : 'NutriLens AI Engine'})
+                </span>
+              )}
+            </div>
+
             {result.notice && (
               <div className="mt-3 flex items-start gap-2 bg-emerald-50/80 border border-emerald-100 text-emerald-800 p-2.5 rounded-xl text-[11px] leading-relaxed text-left">
                 <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
@@ -561,7 +582,7 @@ Check your food healthy scores with Food Barcode Health Scanner!`;
             Ingredients are evaluated against raw food additive standards.
           </p>
 
-          {/* BioLens AI Reconstruction Card */}
+          {/* NutriLens AI Reconstruction Card */}
           {(!result.ingredients || 
             result.ingredients.toLowerCase().includes("no ingredients list") || 
             result.ingredients.toLowerCase().includes("not listed") || 
@@ -572,10 +593,10 @@ Check your food healthy scores with Food Barcode Health Scanner!`;
               </div>
               <h4 className="text-xs font-bold text-emerald-900 flex items-center gap-1.5 font-display">
                 <Sparkles className="w-3.5 h-3.5 text-emerald-700 animate-pulse" />
-                BioLens AI Ingredient Reconstructor
+                NutriLens AI Ingredient Reconstructor
               </h4>
               <p className="text-[11px] text-emerald-700 mt-1.5 leading-relaxed font-normal">
-                Scanned products (especially regional or Indian brands like Haldiram's, Amul, Britannia, Parle-G, Maggi, Kurkure etc.) are often missing details in standard public registries. Trigger BioLens AI to reconstruct this product's authentic formulation and preservatives.
+                Scanned products (especially regional or Indian brands like Haldiram's, Amul, Britannia, Parle-G, Maggi, Kurkure etc.) are often missing details in standard public registries. Trigger NutriLens AI to reconstruct this product's authentic formulation and preservatives.
               </p>
               
               <button
@@ -595,7 +616,7 @@ Check your food healthy scores with Food Barcode Health Scanner!`;
                 ) : (
                   <>
                     <Sparkles className="w-3.5 h-3.5 text-white/90" />
-                    Reconstruct with BioLens AI
+                    Reconstruct with NutriLens AI
                   </>
                 )}
               </button>
@@ -616,12 +637,12 @@ Check your food healthy scores with Food Barcode Health Scanner!`;
           How are missing ingredients and Indian products evaluated?
         </h4>
         <p className="text-[11px] text-stone-600 leading-relaxed font-normal">
-          When a database record lacks complete ingredient text, BioLens evaluates the product's health scale using a dual-mode approach:
+          When a database record lacks complete ingredient text, NutriLens evaluates the product's health scale using a dual-mode approach:
         </p>
         <ul className="mt-2 space-y-1.5 text-[10px] text-stone-500 list-disc list-inside font-normal">
           <li><strong className="text-stone-700">Macro Ratio Scoring:</strong> We analyze the ratio of positive elements (protein, dietary fiber) against negative ones (saturated fats, sugars, sodium density) to produce a Nutri-Score inspired grade.</li>
           <li><strong className="text-stone-700">Active Camera Extraction:</strong> Use our <span className="font-bold text-emerald-800">Ingredients Scanner</span> tab to snap a quick photo of the ingredients list on the packaging for a 100% complete toxicological analysis!</li>
-          <li><strong className="text-stone-700">BioLens Indian Registry Synthesis:</strong> Click the <span className="font-bold text-emerald-800">Reconstruct with BioLens AI</span> button above to trigger a direct lookup and safety evaluation against popular Indian brands.</li>
+          <li><strong className="text-stone-700">NutriLens Indian Registry Synthesis:</strong> Click the <span className="font-bold text-emerald-800">Reconstruct with NutriLens AI</span> button above to trigger a direct lookup and safety evaluation against popular Indian brands.</li>
         </ul>
       </div>
 

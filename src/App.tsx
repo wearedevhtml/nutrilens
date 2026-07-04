@@ -30,9 +30,10 @@ import AnalysisDetails from "./components/AnalysisDetails";
 import IngredientsScanner from "./components/IngredientsScanner";
 import AppLogo from "./components/AppLogo";
 import BarcodeHistory from "./components/BarcodeHistory";
+import FakeProductGuide from "./components/FakeProductGuide";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"scan" | "calculator" | "ingredients">("scan");
+  const [activeTab, setActiveTab] = useState<"scan" | "calculator" | "ingredients" | "fake">("ingredients");
   const [result, setResult] = useState<FoodAnalysisResult | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   
@@ -55,7 +56,7 @@ export default function App() {
 
   // Welcome Splash Screen State
   const [showWelcome, setShowWelcome] = useState(true);
-  const [loadingSub, setLoadingSub] = useState("Initializing BioLens Engine...");
+  const [loadingSub, setLoadingSub] = useState("Initializing NutriLens Engine v2.0...");
 
   useEffect(() => {
     const t1 = setTimeout(() => {
@@ -470,17 +471,31 @@ export default function App() {
               >
                 <Leaf className="w-4 h-4 text-emerald-800 animate-spin" style={{ animationDuration: "3s" }} />
                 <span className="text-[11px] font-display font-extrabold tracking-widest text-emerald-900 uppercase">
-                  BioLens Premium Food Scanner
+                  NutriLens Premium Food Scanner
+                </span>
+                <span className="bg-emerald-600 text-white font-mono text-[9px] font-bold px-1.5 py-0.5 rounded-full ml-1">
+                  v2.0
                 </span>
               </motion.div>
 
               {/* Shared Title */}
               <motion.h1 
                 layoutId="app-title"
-                className="text-3xl md:text-5xl font-display font-black tracking-tight text-stone-900 leading-none"
+                className="text-3xl md:text-5xl font-display font-black tracking-tight text-stone-900 flex flex-wrap items-center justify-center gap-2 md:gap-3 leading-none"
                 transition={{ type: "spring", stiffness: 100, damping: 20 }}
               >
-                BioLens <span className="text-emerald-700 font-medium text-lg md:text-xl block sm:inline sm:ml-1">by ZettaCreations</span>
+                <span className="flex items-center gap-2">
+                  <span>NutriLens</span>
+                  <span className="bg-emerald-600 text-white font-mono text-xs font-bold px-2 py-0.5 rounded-full select-none shadow-xs">
+                    2.0
+                  </span>
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-emerald-700 font-medium text-lg md:text-xl">
+                  <span className="text-stone-300 font-light select-none">|</span>
+                  <span>by</span>
+                  <img src="/zettacreations-logo.jpg" alt="ZettaCreations Logo" className="w-6 h-6 rounded-full object-cover shadow-xs border border-emerald-100" referrerPolicy="no-referrer" />
+                  <span>ZettaCreations</span>
+                </span>
               </motion.h1>
 
               {/* Shared Description */}
@@ -538,11 +553,25 @@ export default function App() {
           <motion.div layoutId="app-badge" className="inline-flex items-center gap-2 bg-emerald-50/90 border border-emerald-100 px-3.5 py-1.5 rounded-full mb-3 shadow-2xs">
             <Leaf className="w-4 h-4 text-emerald-700 animate-pulse" />
             <span className="text-[10px] font-display font-extrabold tracking-widest text-emerald-800 uppercase">
-              BioLens Premium Food Scanner
+              NutriLens Premium Food Scanner
+            </span>
+            <span className="bg-emerald-600 text-white font-mono text-[8px] font-bold px-1.5 py-0.5 rounded-full ml-1">
+              v2.0
             </span>
           </motion.div>
-          <motion.h1 layoutId="app-title" className="text-2xl md:text-4xl font-display font-black tracking-tight text-stone-900 leading-none">
-            BioLens <span className="text-emerald-700 font-medium text-base md:text-lg block md:inline md:ml-1">by ZettaCreations</span>
+          <motion.h1 layoutId="app-title" className="text-2xl md:text-4xl font-display font-black tracking-tight text-stone-900 flex flex-wrap items-center justify-center gap-2 leading-none">
+            <span className="flex items-center gap-1.5">
+              <span>NutriLens</span>
+              <span className="bg-emerald-600 text-white font-mono text-[10px] md:text-xs font-bold px-1.5 py-0.5 rounded-full select-none shadow-xs">
+                2.0
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-emerald-700 font-medium text-base md:text-lg">
+              <span className="text-stone-300 font-light select-none">|</span>
+              <span>by</span>
+              <img src="/zettacreations-logo.jpg" alt="ZettaCreations Logo" className="w-5 h-5 rounded-full object-cover shadow-xs border border-emerald-100" referrerPolicy="no-referrer" />
+              <span>ZettaCreations</span>
+            </span>
           </motion.h1>
           <motion.p layoutId="app-description" className="text-xs md:text-sm text-stone-500 mt-3 max-w-md mx-auto leading-relaxed">
             Instantly score food packaging parameters, analyze chemical additive profiles, scan nutrition labels, and screen toxicology lists with absolute precision.
@@ -600,7 +629,7 @@ export default function App() {
               >
                 
                 {/* Visual Tab Selection bar */}
-                <div className="flex bg-stone-100/80 backdrop-blur-md p-1 rounded-2xl max-w-md mx-auto border border-stone-200/50 shadow-2xs relative z-10">
+                <div className="flex bg-stone-100/80 backdrop-blur-md p-1 rounded-2xl max-w-xl mx-auto border border-stone-200/50 shadow-2xs relative z-10">
                   <button
                     onClick={() => {
                       setActiveTab("scan");
@@ -668,6 +697,29 @@ export default function App() {
                     <span className="relative z-10 flex items-center gap-1.5">
                       <FileText className="w-3.5 h-3.5" />
                       Ingredients
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTab("fake");
+                      setError(null);
+                    }}
+                    className={`relative flex-1 py-2.5 rounded-xl text-xs font-bold font-display transition-colors duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
+                      activeTab === "fake"
+                        ? "text-emerald-900"
+                        : "text-stone-500 hover:text-stone-800"
+                    }`}
+                  >
+                    {activeTab === "fake" && (
+                      <motion.div
+                        layoutId="activeTabBackground"
+                        className="absolute inset-0 bg-white rounded-xl shadow-xs"
+                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                      />
+                    )}
+                    <span className="relative z-10 flex items-center gap-1.5">
+                      <ShieldAlert className="w-3.5 h-3.5 text-amber-700" />
+                      Fake Finder
                     </span>
                   </button>
                 </div>
@@ -956,7 +1008,7 @@ export default function App() {
                           </button>
                         </form>
                       </motion.div>
-                    ) : (
+                    ) : activeTab === "ingredients" ? (
                       <motion.div
                         key="tab-ingredients"
                         initial={{ opacity: 0, y: 15 }}
@@ -966,6 +1018,17 @@ export default function App() {
                         className="w-full"
                       >
                         <IngredientsScanner />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="tab-fake"
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -15 }}
+                        transition={{ duration: 0.25, ease: "easeInOut" }}
+                        className="w-full"
+                      >
+                        <FakeProductGuide />
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -1020,9 +1083,9 @@ export default function App() {
 
         {/* Humid Footer details */}
         <footer className="mt-16 text-center text-[10px] text-stone-400/80 select-none relative z-10 border-t border-stone-200/40 pt-4">
-          <p>© {new Date().getFullYear()} BioLens by ZettaCreations. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} NutriLens. All rights reserved.</p>
           <p className="mt-1">
-            Precision health & toxicological evaluation powered by BioLens AI and scientific ingredients analysis.
+            Precision health & toxicological evaluation powered by NutriLens AI and scientific ingredients analysis.
           </p>
         </footer>
 
