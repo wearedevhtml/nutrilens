@@ -33,7 +33,7 @@ import BarcodeHistory from "./components/BarcodeHistory";
 import FakeProductGuide from "./components/FakeProductGuide";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"scan" | "calculator" | "ingredients" | "fake">("ingredients");
+  const [activeTab, setActiveTab] = useState<"scan" | "calculator" | "ingredients" | "fake">("scan");
   const [result, setResult] = useState<FoodAnalysisResult | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   
