@@ -19,6 +19,7 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import RadialGauge from "./RadialGauge";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { API_BASE } from "../App";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -62,7 +63,7 @@ export default function AnalysisDetails({ result, onBack, onUpdateResult }: Anal
     setIsReconstructing(true);
     setReconstructError(null);
     try {
-      const response = await fetch("/api/augment-product-ai", {
+      const response = await fetch(`${API_BASE}/api/augment-product-ai`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -70,16 +71,35 @@ export default function AnalysisDetails({ result, onBack, onUpdateResult }: Anal
           productName: result.productName,
         }),
       });
-      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error(data.message || data.error || "Failed to reconstruct product data using AI.");
+        let errorMessage = "Failed to reconstruct product data using AI.";
+        try {
+          const errData = await response.json();
+          errorMessage = errData.message || errData.error || errorMessage;
+        } catch (e) {
+          if (response.status === 405 || response.status === 404) {
+            errorMessage = `Backend API returned status ${response.status}. Since you are deployed on Cloudflare Pages, make sure you have added the VITE_API_BASE_URL environment variable in your Cloudflare settings pointing to your live backend server.`;
+          } else {
+            errorMessage = `Server error (status ${response.status}).`;
+          }
+        }
+        throw new Error(errorMessage);
       }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        throw new Error(`Failed to parse backend response as JSON. Ensure your VITE_API_BASE_URL points to the correct backend endpoint and not a static HTML page.`);
+      }
+
       if (onUpdateResult) {
         onUpdateResult(data);
       }
     } catch (err: any) {
       console.log("Reconstruction notification:", err?.message || err);
-      setReconstructError("error");
+      setReconstructError(err?.message || "error");
     } finally {
       setIsReconstructing(false);
     }

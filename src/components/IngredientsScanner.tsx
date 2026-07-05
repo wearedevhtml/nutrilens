@@ -20,6 +20,7 @@ import {
   ScanLine
 } from "lucide-react";
 import RadialGauge from "./RadialGauge";
+import { API_BASE } from "../App";
 
 export default function IngredientsScanner() {
   const [ingredientsText, setIngredientsText] = useState("");
@@ -204,7 +205,7 @@ export default function IngredientsScanner() {
     }
 
     try {
-      const response = await fetch("/api/analyze-ingredients", {
+      const response = await fetch(`${API_BASE}/api/analyze-ingredients`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -216,11 +217,27 @@ export default function IngredientsScanner() {
       });
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || `Analysis failed with status ${response.status}`);
+        let errorMessage = `Analysis failed with status ${response.status}`;
+        try {
+          const errData = await response.json();
+          errorMessage = errData.message || errData.error || errorMessage;
+        } catch (e) {
+          if (response.status === 405 || response.status === 404) {
+            errorMessage = `Backend API returned status ${response.status}. Since you are deployed on Cloudflare Pages, make sure you have added the VITE_API_BASE_URL environment variable in your Cloudflare settings pointing to your live backend server.`;
+          } else {
+            errorMessage = `Server error (status ${response.status}).`;
+          }
+        }
+        throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        throw new Error(`Failed to parse backend response as JSON. Ensure your VITE_API_BASE_URL points to the correct backend endpoint and not a static HTML page.`);
+      }
+
       setResult(data);
       if (data.ingredients) {
         setIngredientsText(data.ingredients);

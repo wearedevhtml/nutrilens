@@ -32,6 +32,10 @@ import AppLogo from "./components/AppLogo";
 import BarcodeHistory from "./components/BarcodeHistory";
 import FakeProductGuide from "./components/FakeProductGuide";
 
+// Resolve Base URL for API requests (supports Cloudflare Pages environments via VITE_API_BASE_URL / VITE_API_URL)
+const metaEnv = (import.meta as any).env || {};
+export const API_BASE = (metaEnv.VITE_API_BASE_URL || metaEnv.VITE_API_URL || "").replace(/\/$/, "");
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<"scan" | "calculator" | "ingredients" | "fake">("scan");
   const [result, setResult] = useState<FoodAnalysisResult | null>(null);
@@ -136,16 +140,32 @@ export default function App() {
     const cleanBarcode = barcode.trim();
 
     try {
-      const response = await fetch("/api/analyze-barcode", {
+      const response = await fetch(`${API_BASE}/api/analyze-barcode`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ barcode: cleanBarcode, source: "webapp" }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.message || data.error || "Failed to analyze barcode.");
+        let errorMessage = "Failed to analyze barcode.";
+        try {
+          const errData = await response.json();
+          errorMessage = errData.message || errData.error || errorMessage;
+        } catch (e) {
+          if (response.status === 405 || response.status === 404) {
+            errorMessage = `Backend API returned status ${response.status}. Since you are deployed on Cloudflare Pages, make sure you have added the VITE_API_BASE_URL environment variable in your Cloudflare settings pointing to your live backend server.`;
+          } else {
+            errorMessage = `Server error (status ${response.status}).`;
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        throw new Error(`Failed to parse backend response as JSON. Ensure your VITE_API_BASE_URL points to the correct backend endpoint (e.g. your Cloud Run backend) and not a static HTML page.`);
       }
 
       setResult(data);
@@ -223,16 +243,32 @@ export default function App() {
     setOfflineNotice(null);
 
     try {
-      const response = await fetch("/api/analyze-barcode", {
+      const response = await fetch(`${API_BASE}/api/analyze-barcode`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64Image, source: "camera" }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.message || data.error || "Failed to analyze image.");
+        let errorMessage = "Failed to analyze image.";
+        try {
+          const errData = await response.json();
+          errorMessage = errData.message || errData.error || errorMessage;
+        } catch (e) {
+          if (response.status === 405 || response.status === 404) {
+            errorMessage = `Backend API returned status ${response.status}. Since you are deployed on Cloudflare Pages, make sure you have added the VITE_API_BASE_URL environment variable in your Cloudflare settings pointing to your live backend server.`;
+          } else {
+            errorMessage = `Server error (status ${response.status}).`;
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonErr) {
+        throw new Error(`Failed to parse backend response as JSON. Ensure your VITE_API_BASE_URL points to the correct backend endpoint (e.g. your Cloud Run backend) and not a static HTML page.`);
       }
 
       setResult(data);
